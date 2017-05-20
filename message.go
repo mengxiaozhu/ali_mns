@@ -6,15 +6,17 @@ import (
 )
 
 type notifyStrategyType string
+
 const (
-    BACKOFF_RETRY            notifyStrategyType = "BACKOFF_RETRY"
-	EXPONENTIAL_DECAY_RETRY  notifyStrategyType = "EXPONENTIAL_DECAY_RETRY"
+	BACKOFF_RETRY           notifyStrategyType = "BACKOFF_RETRY"
+	EXPONENTIAL_DECAY_RETRY notifyStrategyType = "EXPONENTIAL_DECAY_RETRY"
 )
 
 type notifyContentFormatType string
+
 const (
-    XML          notifyContentFormatType  =  "XML"
-	SIMPLIFIED   notifyContentFormatType  =  "SIMPLIFIED"
+	XML        notifyContentFormatType = "XML"
+	SIMPLIFIED notifyContentFormatType = "SIMPLIFIED"
 )
 
 type MessageResponse struct {
@@ -41,21 +43,26 @@ type MessageSendRequest struct {
 }
 
 type MessagePublishRequest struct {
-	XMLName            xml.Name           `xml:"Message" json:"-"`
-	MessageBody        string             `xml:"MessageBody" json:"message_body"`
-	MessageTag         string             `xml:"MessageTag,omitempty" json:"message_tag,omitempty"`
-	MessageAttributes  *MessageAttributes  `xml:"MessageAttributes,omitempty" json:"message_attributes,omitempty"`
+	XMLName           xml.Name           `xml:"Message" json:"-"`
+	MessageBody       string             `xml:"MessageBody" json:"message_body"`
+	MessageTag        string             `xml:"MessageTag,omitempty" json:"message_tag,omitempty"`
+	MessageAttributes *MessageAttributes  `xml:"MessageAttributes,omitempty" json:"message_attributes,omitempty"`
 }
 
 type MessageAttributes struct {
-	XMLName           xml.Name          `xml:"MessageAttributes" json:"-"`
-	MailAttributes    *MailAttributes   `xml:"DirectMail,omitempty" json:"direct_mail,omitempty"`
+	XMLName        xml.Name          `xml:"MessageAttributes" json:"-"`
+	MailAttributes *MailAttributes   `xml:"DirectMail,omitempty" json:"direct_mail,omitempty"`
+	SMSAttributes  *SMSAttributes  `xml:"DirectSMS,omitempty" json:"direct_sms,omitempty"`
+	ETag           string `xml:",innerxml"`
 }
 
 type messageAttributesXML struct {
-	XMLName           xml.Name            `xml:"MessageAttributes"`
-	MailAttributes    string              `xml:"DirectMail,omitempty"`
+	XMLName        xml.Name            `xml:"MessageAttributes"`
+	MailAttributes string              `xml:"DirectMail,omitempty"`
+	SMSAttributes  string              `xml:"DirectSMS,omitempty"`
+	ETag           string `xml:",innerxml"`
 }
+
 func (m *MessageAttributes) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	mailAttributesStr := ""
 	if m.MailAttributes != nil {
@@ -65,12 +72,29 @@ func (m *MessageAttributes) MarshalXML(e *xml.Encoder, start xml.StartElement) e
 		}
 		mailAttributesStr = string(mailAttributesByte)
 	}
-    n := &messageAttributesXML{
-        MailAttributes: mailAttributesStr,
-    }
-    return e.Encode(n)
+	smsAttributesStr := ""
+	if m.SMSAttributes != nil {
+		smsAttributesByte, err := json.Marshal(m.SMSAttributes)
+		if err != nil {
+			return err
+		}
+		smsAttributesStr = string(smsAttributesByte)
+	}
+	n := &messageAttributesXML{
+		MailAttributes: mailAttributesStr,
+		SMSAttributes:  smsAttributesStr,
+		ETag:           m.ETag,
+	}
+	return e.Encode(n)
 }
 
+type SMSAttributes struct {
+	FreeSignName string
+	TemplateCode string
+	Type         string
+	Receiver     string
+	SmsParams    string
+}
 type MailAttributes struct {
 	Subject        string      `json:"Subject"`
 	AccountName    string      `json:"AccountName"`
@@ -78,6 +102,7 @@ type MailAttributes struct {
 	IsHtml         bool        `json:"IsHtml"`
 	ReplyToAddress int32       `json:"ReplyToAddress"`
 }
+
 func (m *MailAttributes) MarshalJSON() ([]byte, error) {
 	type Alias MailAttributes
 	isHtml := 0
@@ -88,8 +113,8 @@ func (m *MailAttributes) MarshalJSON() ([]byte, error) {
 		IsHtml int `json:"IsHtml"`
 		*Alias
 	}{
-		IsHtml:   isHtml,
-		Alias:    (*Alias)(m),
+		IsHtml: isHtml,
+		Alias:  (*Alias)(m),
 	})
 }
 
@@ -116,11 +141,11 @@ type MessageSendResponse struct {
 	MessageId      string `xml:"MessageId" json:"message_id"`
 	MessageBodyMD5 string `xml:"MessageBodyMD5" json:"message_body_md5"`
 	// ReceiptHandle is assigned when any DelayMessage is sent
-	ReceiptHandle  string `xml:"ReceiptHandle,omitempty"`
+	ReceiptHandle string `xml:"ReceiptHandle,omitempty"`
 }
 
 type BatchMessageSendEntry struct {
-	XMLName  xml.Name              `xml:"Message" json:"-"`
+	XMLName        xml.Name              `xml:"Message" json:"-"`
 	ErrorCode      string `xml:"ErrorCode,omitempty" json:"error_code,omitempty"`
 	ErrorMessage   string `xml:"ErrorMessage,omitempty" json:"error_messages,omitempty"`
 	MessageId      string `xml:"MessageId,omitempty" json:"message_id,omitempty"`
@@ -133,14 +158,14 @@ type BatchMessageSendResponse struct {
 }
 
 type MessageDeleteFailEntry struct {
-	XMLName  xml.Name              `xml:"Error" json:"-"`
-	ErrorCode      string `xml:"ErrorCode" json:"error_code"`
-	ErrorMessage   string `xml:"ErrorMessage" json:"error_messages"`
-	ReceiptHandle  string `xml:"ReceiptHandle,omitempty" json:"receipt_handle"`
+	XMLName       xml.Name              `xml:"Error" json:"-"`
+	ErrorCode     string `xml:"ErrorCode" json:"error_code"`
+	ErrorMessage  string `xml:"ErrorMessage" json:"error_messages"`
+	ReceiptHandle string `xml:"ReceiptHandle,omitempty" json:"receipt_handle"`
 }
 
 type BatchMessageDeleteErrorResponse struct {
-	XMLName  xml.Name              `xml:"Errors" json:"-"`
+	XMLName        xml.Name              `xml:"Errors" json:"-"`
 	FailedMessages []MessageDeleteFailEntry `xml:"Error" json:"errors"`
 }
 
@@ -154,9 +179,9 @@ type CreateQueueRequest struct {
 }
 
 type CreateTopicRequest struct {
-	XMLName                xml.Name `xml:"Topic" json:"-"`
-	MaxMessageSize         int32    `xml:"MaximumMessageSize,omitempty" json:"maximum_message_size,omitempty"`
-	LoggingEnabled         bool     `xml:"LoggingEnabled" json:"logging_enabled"`
+	XMLName        xml.Name `xml:"Topic" json:"-"`
+	MaxMessageSize int32    `xml:"MaximumMessageSize,omitempty" json:"maximum_message_size,omitempty"`
+	LoggingEnabled bool     `xml:"LoggingEnabled" json:"logging_enabled"`
 }
 
 type MessageReceiveResponse struct {
@@ -210,22 +235,22 @@ type TopicAttribute struct {
 }
 
 type SubscriptionAttribute struct {
-	XMLName                xml.Name `xml:"Subscription" json:"-"`
-	SubscriptionName       string   `xml:"SubscriptionName,omitempty" json:"queue_name,omitempty"`
-	Subscriber             string   `xml:"Subscriber,omitempty" json:"subscriber,omitempty"`
-	TopicOwner             string   `xml:"TopicOwner,omitempty" json:"topic_owner,omitempty"`
-	TopicName              string   `xml:"TopicName,omitempty" json:"topic_name,omitempty"`
-	Endpoint               string    `xml:"Endpoint,omitempty" json:"endpoint,omitempty"`
-	NotifyStrategy  notifyStrategyType `xml:"NotifyStrategy,omitempty" json:"notify_strategy,omitempty"`
-	NotifyContentFormat  notifyContentFormatType `xml:"NotifyContentFormat,omitempty" json:"notify_content_format,omitempty"`
-	FilterTag              string    `xml:"FilterTag,omitempty" json:"filter_tag,omitempty"`
-	CreateTime             int64    `xml:"CreateTime,omitempty" json:"create_time,omitempty"`
-	LastModifyTime         int64    `xml:"LastModifyTime,omitempty" json:"last_modify_time,omitempty"`
+	XMLName             xml.Name `xml:"Subscription" json:"-"`
+	SubscriptionName    string   `xml:"SubscriptionName,omitempty" json:"queue_name,omitempty"`
+	Subscriber          string   `xml:"Subscriber,omitempty" json:"subscriber,omitempty"`
+	TopicOwner          string   `xml:"TopicOwner,omitempty" json:"topic_owner,omitempty"`
+	TopicName           string   `xml:"TopicName,omitempty" json:"topic_name,omitempty"`
+	Endpoint            string    `xml:"Endpoint,omitempty" json:"endpoint,omitempty"`
+	NotifyStrategy      notifyStrategyType `xml:"NotifyStrategy,omitempty" json:"notify_strategy,omitempty"`
+	NotifyContentFormat notifyContentFormatType `xml:"NotifyContentFormat,omitempty" json:"notify_content_format,omitempty"`
+	FilterTag           string    `xml:"FilterTag,omitempty" json:"filter_tag,omitempty"`
+	CreateTime          int64    `xml:"CreateTime,omitempty" json:"create_time,omitempty"`
+	LastModifyTime      int64    `xml:"LastModifyTime,omitempty" json:"last_modify_time,omitempty"`
 }
 
 type SetSubscriptionAttributesRequest struct {
-	XMLName         xml.Name           `xml:"Subscription" json:"-"`
-	NotifyStrategy  notifyStrategyType `xml:"NotifyStrategy,omitempty" json:"notify_strategy,omitempty"`
+	XMLName        xml.Name           `xml:"Subscription" json:"-"`
+	NotifyStrategy notifyStrategyType `xml:"NotifyStrategy,omitempty" json:"notify_strategy,omitempty"`
 }
 
 type Queue struct {
@@ -253,7 +278,7 @@ type Subscription struct {
 }
 
 type Subscriptions struct {
-	XMLName           xml.Name        `xml:"Subscriptions" json:"-"`
-	Subscriptions     []Subscription  `xml:"Subscription" json:"subscriptions"`
-	NextMarker        string          `xml:"NextMarker" json:"next_marker"`
+	XMLName       xml.Name        `xml:"Subscriptions" json:"-"`
+	Subscriptions []Subscription  `xml:"Subscription" json:"subscriptions"`
+	NextMarker    string          `xml:"NextMarker" json:"next_marker"`
 }
